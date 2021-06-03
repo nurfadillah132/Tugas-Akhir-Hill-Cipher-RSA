@@ -9,10 +9,10 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication,QWidget, QVBoxLayout, QPushButton, QFileDialog , QLabel, QTextEdit
+from PyQt5.QtWidgets import QApplication,QWidget, QVBoxLayout, QPushButton, QFileDialog , QLabel, QTextEdit, QListWidgetItem, QListWidget
 from PyQt5.QtCore import *
 import sys
-from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtGui import QPixmap, QImage, QIcon
 from PIL import Image
 from numpy import asarray
 import numpy as np
@@ -95,17 +95,15 @@ class Ui_MainWindow(QWidget):
         self.groupBox_4 = QtWidgets.QGroupBox(self.centralwidget)
         self.groupBox_4.setGeometry(QtCore.QRect(30, 190, 261, 211))
         self.groupBox_4.setObjectName("groupBox_4")
-        self.encLbl = QtWidgets.QLabel(self.groupBox_4)
-        self.encLbl.setGeometry(QtCore.QRect(10, 20, 241, 181))
-        self.encLbl.setText("")
-        self.encLbl.setObjectName("encLbl")
+        self.listWidget = QtWidgets.QListWidget(self.groupBox_4)
+        self.listWidget.setGeometry(QtCore.QRect(10, 20, 241, 181))
+        self.listWidget.setObjectName("listWidget")
         self.groupBox_5 = QtWidgets.QGroupBox(self.centralwidget)
         self.groupBox_5.setGeometry(QtCore.QRect(340, 190, 261, 211))
         self.groupBox_5.setObjectName("groupBox_5")
-        self.decLbl = QtWidgets.QLabel(self.groupBox_5)
-        self.decLbl.setGeometry(QtCore.QRect(10, 20, 241, 181))
-        self.decLbl.setText("")
-        self.decLbl.setObjectName("decLbl")
+        self.listWidget_2 = QtWidgets.QListWidget(self.groupBox_5)
+        self.listWidget_2.setGeometry(QtCore.QRect(10, 20, 241, 181))
+        self.listWidget_2.setObjectName("listWidget_2")
         self.layoutWidget3 = QtWidgets.QWidget(self.centralwidget)
         self.layoutWidget3.setGeometry(QtCore.QRect(30, 410, 571, 41))
         self.layoutWidget3.setObjectName("layoutWidget3")
@@ -156,31 +154,35 @@ class Ui_MainWindow(QWidget):
 
     def getImage(self, btn):
         #membuka file dialog
-        self.fname = QFileDialog.getOpenFileName(self, 'Open file','c:\\', "Image files (*.png )")
+        self.fname = QFileDialog.getOpenFileNames(self, 'Open file','c:\\', "Image files (*.png )")
 
         #menegecek file
         if self.fname != ('', ''):
             self.searchBar.setText('{}'.format(self.fname))
             self.imagePath = self.fname[0]
-            self.data = Image.open(self.imagePath)
-            self.data = np.asarray(self.data, dtype=np.uint8)
-            if self.encBox.isChecked():
-                self.data = Image.open(self.imagePath)
+            self.newdata = []
+            for i in range(len(self.imagePath)):
+                self.data = Image.open(self.imagePath[i])
                 self.data = np.asarray(self.data, dtype=np.uint8)
-                pixmap = QPixmap(self.imagePath)
-                pixmap = pixmap.scaled(self.encLbl.width(),self.encLbl.height())
-                self.encLbl.setPixmap(QPixmap(pixmap))
+                self.newdata.append(self.data)
+            self.showImage()
+
+    def showImage(self):
+        for i in range(len(self.imagePath)):
+            name = os.path.basename(self.imagePath[i])
+            it = QtWidgets.QListWidgetItem(name)
+            it.setIcon(QtGui.QIcon(self.imagePath[i]))
+            if self.encBox.isChecked():
+                self.listWidget.addItem(it)
             elif self.decBox.isChecked():
-                pixmap = QPixmap(self.imagePath)
-                pixmap = pixmap.scaled(self.decLbl.width(),self.decLbl.height())
-                self.decLbl.setPixmap(QPixmap(pixmap))
+                self.listWidget_2.addItem(it)
 
     def checkBox(self, state):
         if state == Qt.Checked:
             if self.sender() == self.encBox:
                 self.searchBar.clear()
-                self.encLbl.clear()
-                self.decLbl.clear()
+                self.listWidget.clear()
+                self.listWidget_2.clear()
                 self.decBox.setChecked(False)
                 self.privkeyBtn.setEnabled(False)
                 self.cipherkeyBtn.setEnabled(False)
@@ -188,8 +190,8 @@ class Ui_MainWindow(QWidget):
 
             elif self.sender() == self.decBox:
                 self.searchBar.clear()
-                self.encLbl.clear()
-                self.decLbl.clear()
+                self.listWidget.clear()
+                self.listWidget_2.clear()
                 self.encBox.setChecked(False)
                 self.pubkeyBtn.setEnabled(False)
                 self.privkeyBtn.setEnabled(True)
@@ -197,16 +199,16 @@ class Ui_MainWindow(QWidget):
         elif state == Qt.Unchecked:
             if self.sender() == self.encBox:
                 self.searchBar.clear()
-                self.encLbl.clear()
-                self.decLbl.clear()
+                self.listWidget.clear()
+                self.listWidget_2.clear()
                 self.privkeyBtn.setEnabled(True)
                 self.cipherkeyBtn.setEnabled(True)
                 self.pubkeyBtn.setEnabled(True)
 
             elif self.sender() == self.decBox:
                 self.searchBar.clear()
-                self.encLbl.clear()
-                self.decLbl.clear()
+                self.listWidget.clear()
+                self.listWidget_2.clear()
                 self.pubkeyBtn.setEnabled(True)
                 self.privkeyBtn.setEnabled(True)
                 self.cipherkeyBtn.setEnabled(True)
@@ -294,15 +296,20 @@ class Ui_MainWindow(QWidget):
 
     def enkripsi_hill(self):
         t1 = time.time()
-        #E = P x K
-        cipherimage= np.dot(self.data, self.key)
-        # E = E % 256
-        cipherimage = cipherimage % 256
-        #Mengubah ke tipe data uin8(0-255)
-        cipherimage = np.uint8(cipherimage)
-        #Menyimpan gambar
-        imageio.imwrite('enkripsi' + self.DATESTRING + '.png', cipherimage)
-        #enkripsi kunci hill
+        newdataimage =[]
+        for i in range(len(self.newdata)):
+            dataimage =np.asarray(self.newdata[i], dtype=np.uint8)
+            cipherimage = np.dot(dataimage, self.key)
+            newcipherimage = cipherimage % 256
+            cipherimage1 = np.uint8(newcipherimage)
+            imageio.imwrite(str(i) + 'enkripsi' + self.DATESTRING + '.png', cipherimage1)
+            item = QtWidgets.QListWidgetItem(str(i) + 'enkripsi' + self.DATESTRING + '.png')
+            icon = QtGui.QIcon()
+            im = QImage(cipherimage1.data, cipherimage1.shape[1], cipherimage1.shape[0], cipherimage1.shape[1]*3, QImage.Format_RGB888)
+            icon.addPixmap(QtGui.QPixmap(im), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            item.setIcon(icon)
+            self.listWidget_2.addItem(item)
+        # enkripsi kunci hill
         d = int(self.fKey[1])
         n = int(self.fKey[0])
         keyTarget = self.matrix_to_str(self.key)
@@ -313,10 +320,6 @@ class Ui_MainWindow(QWidget):
         fo = open('cipherkey' + self.DATESTRING + '.txt', 'w')
         fo.write('%s' % (encrypt_key))
         fo.close()
-        im = cipherimage
-        im = QImage(im.data, im.shape[1], im.shape[0], im.shape[1]*3, QImage.Format_RGB888)
-        pixmap = QPixmap(im).scaled(self.decLbl.width(),self.decLbl.height())
-        self.decLbl.setPixmap(pixmap)
         t2 = time.time()
         print(t2-t1)
 
@@ -338,18 +341,21 @@ class Ui_MainWindow(QWidget):
         lp = self.list_to_matrix(lp)
         lp = np.asarray(lp)
         lp = self.inv_matrix(lp)
-        #enkripsi ciphergambar menjadi gambar asli
-        plainimage= np.dot(self.data, lp)
-        #D = D % 256
-        plainimage = plainimage % 256
-        #Mengubah ke tipe data uin8(0-255)
-        plainimage = np.uint8(plainimage)
-        #Menyimpan gambar
-        imageio.imwrite('dekripsi' + self.DATESTRING + '.png', plainimage)
-        im = plainimage
-        im = QImage(im.data, im.shape[1], im.shape[0], im.shape[1]*3, QImage.Format_RGB888)
-        pixmap = QPixmap(im).scaled(self.encLbl.width(),self.encLbl.height())
-        self.encLbl.setPixmap(pixmap)
+        for i in range(len(self.newdata)):
+            #enkripsi ciphergambar menjadi gambar asli
+            plainimage= np.dot(self.newdata[i], lp)
+            #D = D % 256
+            plainimage = plainimage % 256
+            #Mengubah ke tipe data uin8(0-255)
+            plainimage = np.uint8(plainimage)
+            #Menyimpan gambar
+            imageio.imwrite(str(i) + 'dekripsi' + self.DATESTRING + '.png', plainimage)
+            item = QtWidgets.QListWidgetItem(str(i) + 'dekripsi' + self.DATESTRING + '.png')
+            icon = QtGui.QIcon()
+            im = QImage(plainimage.data, plainimage.shape[1], plainimage.shape[0], plainimage.shape[1]*3, QImage.Format_RGB888)
+            icon.addPixmap(QtGui.QPixmap(im), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            item.setIcon(icon)
+            self.listWidget.addItem(item)
         t2 = time.time()
         print(t2-t1)
 
